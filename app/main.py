@@ -53,16 +53,22 @@ def health():
 
 # ✅ 2. Ask (MAIN)
 @app.post("/ask")
-def ask(q: Query):
-    result = rag_app.invoke({
-        "question": q.question,
-        "retry_count": 0
-    })
+def ask(data: dict):
+    question = data["question"]
+    thread_id = data.get("thread_id", "default")
+
+    result = rag_app.invoke(
+        {"question": question},
+        config={"configurable": {"thread_id": thread_id}}
+    )
 
     return {
-        "answer": result.get("generation"),
-        "valid": result.get("valid")
+    "answer": result["generation"],
+    "debug": {
+        "use_retrieval": result.get("use_retrieval"),
+        "retry_count": result.get("retry_count")
     }
+}
 
 
 # ✅ 3. Retrieval debug

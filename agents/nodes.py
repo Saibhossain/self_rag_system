@@ -1,6 +1,7 @@
 import os
 from langchain_openai import ChatOpenAI
 from langchain_core.documents import Document
+from langchain_core.messages import HumanMessage, AIMessage
 from agents.prompts import *
 
 from app.config import MAX_RETRIES
@@ -19,6 +20,7 @@ def rewrite(state):
 
     return {
         "question": new_q.content.strip(),
+        "messages": state.get("messages", []) + [HumanMessage(content=q)],
         "retry_count": state.get("retry_count", 0) + 1
     }
     
@@ -60,28 +62,52 @@ def filter_documents(state):
 
 
 def generate(state):
-    context = "\n\n".join([d.page_content for d in state["documents"]])
+    messages = state.get("messages", [])
+    
+    if state.get("use_retrieval") and state.get("documents"):
+        docs = state.get("documents",[])
+        context = "\n\n".join([d.page_content for d in docs])
+        
+        messages = messages+[
+            HumanMessage(
+                content=ANSWER_PROMPT.format(
+                    context=context[:3000],
+                    question=state["question"]
+                )
+            )
+        ] 
+        
+    # normal massage chat with out retrival    
+    else :
+        messages = messages + [
+            HumanMessage(content=state["question"])
+        ]
 
-    answer = llm.invoke(
-        ANSWER_PROMPT.format(
-            context=context[:3000],  # token control
-            question=state["question"]
-        )
-    )
+    answer = llm.invoke(messages)
 
-    return {"generation": answer.content}
+    return {
+        "generation": answer.content,
+        "messages": messages + [AIMessage(content=answer.content)]
+    }
 
 
 def evaluate(state):
-    result = llm.invoke(
-        EVAL_PROMPT.format(
-            question=state["question"],
-            answer=state["generation"]
+    messages = state.get("messages", [])
+
+    messages = messages + [
+        HumanMessage(
+            content=EVAL_PROMPT.format(
+                question=state["question"],
+                answer=state["generation"]
+            )
         )
-    )
+    ]
+
+    result = llm.invoke(messages)
 
     return {
-        "valid": "yes" in result.content.lower()
+        "valid": "yes" in result.content.lower(),
+        "messages": messages
     }
     
     
@@ -91,6 +117,11 @@ def evaluate(state):
 
 def route_after_decision(state):
     return "retrieve" if state["use_retrieval"] else "generate"
+
+def route_after_generate(state):
+    if state.get("use_retrieval"):
+        return "evaluate"
+    return "end"
 
 
 def route_after_eval(state):

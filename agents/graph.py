@@ -1,5 +1,7 @@
 from langgraph.graph import StateGraph, END
 from agents.state import GraphState
+from langgraph.checkpoint.memory import MemorySaver
+
 from agents.nodes import *
 
 import os
@@ -30,7 +32,17 @@ def build_graph(retriever):
 
     workflow.add_edge("retrieve", "filter")
     workflow.add_edge("filter", "generate")
-    workflow.add_edge("generate", "evaluate")
+    
+    workflow.add_conditional_edges(
+        "generate",
+        route_after_generate,
+        {
+            "evaluate": "evaluate",
+            "end": END
+        }
+    )
+
+
 
     workflow.add_conditional_edges(
         "evaluate",
@@ -40,7 +52,9 @@ def build_graph(retriever):
             "end": END
         }
     )
-    app = workflow.compile()
+    memory = MemorySaver()
+    
+    app = workflow.compile(checkpointer=memory)
     return app
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 #============================ rewrite user prompt ===================
 REWRITE_PROMPT = """
-Rewrite the question to improve retrieval.
+Rewrite the question only to improve clarity, grammar, or spelling.
+Do NOT add new information, sub-questions, or change the meaning.
 
 Question: {question}
 """
@@ -8,12 +9,20 @@ Question: {question}
 #============================ retrieve decision yes or no ===============
 
 RETRIEVE_DECISION_PROMPT = """
-Do we need external knowledge to answer this?
+Decide if external documents are REQUIRED to answer the question.
+
+Rules:
+- Answer "no" if the question is general knowledge.
+- Answer "no" if a basic definition is enough.
+- Answer "yes" only if:
+  - the answer depends on specific documents
+  - OR requires private, local, or up-to-date data
 
 Question: {question}
 
 Answer ONLY: yes or no
 """
+
 #============================ filter only most relevent ===============
 
 DOC_FILTER_PROMPT = """
